@@ -34,8 +34,8 @@ char readinput() {
     }
 
 /***************************************************************************************************************** */
-int nmove=0, is_selected;
-int movepece(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
+int nmove=0, is_selected, is_validmove;
+int movepiece(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
 
     ChessB[ Cur2[0] ][ Cur2[1] ]=ChessB[ Cur1[0] ][ Cur1[1] ];
     ChessB[ Cur1[0] ][ Cur1[1] ]='.';
@@ -51,6 +51,63 @@ int movepece(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
     
     nmove++;
     return 0;
+
+}
+
+/******************************************************************************************************** */
+
+int checkmove(char ChessB[8][8], int Cur1[2], int Cur2[2]) {   //funzione che controlla se la mossa è valida, ritorna 1 se lo è, 0 altrimenti
+    //controllo che il giocatore muova i suoi pezzi
+    if((nmove & 1) && (ChessB[ Cur1[0] ][ Cur1[1] ]>96) && (ChessB[ Cur1[0] ][ Cur1[1] ]<116)   ||  !(nmove & 1) && (ChessB[ Cur1[0] ][ Cur1[1] ]>64) && (ChessB[ Cur1[0] ][ Cur1[1] ]<90)) {
+        switch(ChessB[ Cur1[0] ][ Cur1[1] ]) {
+            case 'p':   //pedone nero
+                if(Cur2[0]==Cur1[0]+1 && Cur2[1]==Cur1[1] && ChessB[ Cur2[0] ][ Cur2[1] ]=='.') return 1; //mossa in avanti
+                else if(Cur2[0]==Cur1[0]+2 && Cur2[1]==Cur1[1] && ChessB[ Cur2[0] ][ Cur2[1] ]=='.' && ChessB[ Cur2[0]-1 ][ Cur2[1] ]=='.' && Cur1[0]==1) return 1; //mossa in avanti di due caselle
+                else if(Cur2[0]==Cur1[0]+1 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1) && ChessB[ Cur2[0] ][ Cur2[1] ]>='A' && ChessB[ Cur2[0] ][ Cur2[1] ]<='Z') return 1; //mossa in diagonale per cattura
+                break;
+            case 'P':   //pedone bianco
+                if(Cur2[0]==Cur1[0]-1 && Cur2[1]==Cur1[1] && ChessB[ Cur2[0] ][ Cur2[1] ]=='.') return 1; //mossa in avanti
+                else if(Cur2[0]==Cur1[0]-2 && Cur2[1]==Cur1[1] && ChessB[ Cur2[0] ][ Cur2[1] ]=='.' && ChessB[ Cur2[0]+1 ][ Cur2[1] ]=='.' && Cur1[0]==6) return 1; //mossa in avanti di due caselle
+                else if(Cur2[0]==Cur1[0]-1 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1) && ChessB[ Cur2[0] ][ Cur2[1] ]>='a' && ChessB[ Cur2[0] ][ Cur2[1] ]<='z') return 1; //mossa in diagonale per cattura
+                break;
+            case 'r':   //torre nera
+                if(Cur2[0]==Cur1[0] || Cur2[1]==Cur1[1]) return 1; //mossa in linea retta
+                break; 
+            case 'R':   //torre bianca
+                if(Cur2[0]==Cur1[0] || Cur2[1]==Cur1[1]) return 1; //mossa in linea retta
+                break;
+            case 'n':   //cavallo nero
+                if((Cur2[0]==Cur1[0]+2 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1)) || (Cur2[0]==Cur1[0]-2 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1)) || 
+                    (Cur2[0]==Cur1[0]+1 && (Cur2[1]==Cur1[1]+2 || Cur2[1]==Cur1[1]-2)) || (Cur2[0]==Cur1[0]-1 && (Cur2[1]==Cur1[1]+2 || Cur2[1]==Cur1[1]-2))) return 1; //mossa a L
+                break;
+            case 'N':   //cavallo bianco
+                if((Cur2[0]==Cur1[0]+2 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1)) || (Cur2[0]==Cur1[0]-2 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1)) || 
+                    (Cur2[0]==Cur1[0]+1 && (Cur2[1]==Cur1[1]+2 || Cur2[1]==Cur1[1]-2)) || (Cur2[0]==Cur1[0]-1 && (Cur2[1]==Cur1[1]+2 || Cur2[1]==Cur1[1]-2))) return 1; //mossa a L
+                break;
+            case 'b':   //alfiere nero
+                if(abs(Cur2[0]-Cur1[0])==abs(Cur2[1]-Cur1[1])) return 1; //mossa in diagonale
+                break;
+            case 'B':   //alfiere bianco
+                if(abs(Cur2[0]-Cur1[0])==abs(Cur2[1]-Cur1[1])) return 1; //mossa in diagonale
+                break;
+            case 'q':   //regina nera
+                if(Cur2[0]==Cur1[0] || Cur2[1]==Cur1[1] || abs(Cur2[0]-Cur1[0])==abs(Cur2[1]-Cur1[1])) return 1; //mossa in linea retta o diagonale
+                break;
+            case 'Q':   //regina bianca
+                if(Cur2[0]==Cur1[0] || Cur2[1]==Cur1[1] || abs(Cur2[0]-Cur1[0])==abs(Cur2[1]-Cur1[1])) return 1; //mossa in linea retta o diagonale
+                break;
+            case 'k':   //re nero
+                if(abs(Cur2[0]-Cur1[0])<=1 && abs(Cur2[1]-Cur1[1])<=1) return 1; //mossa di una casella in qualsiasi direzione
+                break;
+            case 'K':   //re bianco
+                if(abs(Cur2[0]-Cur1[0])<=1 && abs(Cur2[1]-Cur1[1])<=1) return 1; //mossa di una casella in qualsiasi direzione
+                break; 
+            default:
+                return 0;
+        }
+        return 0;
+    }
+    else return 0;
 
 }
 
@@ -165,8 +222,7 @@ for(i = 0; i < 8; i++) {
             printf("|");
             
             // Determina se la cella corrente è selezionata dal cursore
-            int is_selected = (!firstC && Cur1[0] == i && Cur1[1] == j) || 
-                              (firstC && Cur2[0] == i && Cur2[1] == j);
+            int is_selected = (Cur1[0] == i && Cur1[1] == j) || (Cur2[0] == i && Cur2[1] == j);
 
             switch (ChessB[i][j]) {
                 case 'p': printf("%s", is_selected ? PawnBC[x] : PawnB[x]); break;
@@ -213,21 +269,24 @@ for(i = 0; i < 8; i++) {
         //x e y sono le coordiante del cursore, ogni volta che mi muovo negono aggiornate
         if(!firstC) {//modifico il primo cursore
 
-            if(input=='w' || input=='W') Cur1[0]--;
-            else if(input=='s' || input=='S') Cur1[0]++;
-            else if(input=='d' || input=='D')   Cur1[1]++;
-            else if(input=='a' || input=='A')   Cur1[1]--;
+            if((input=='w' || input=='W') && Cur1[0] > 0) Cur1[0]--;
+            else if((input=='s' || input=='S') && Cur1[0] < 7) Cur1[0]++;
+            else if((input=='d' || input=='D') && Cur1[1] < 7)   Cur1[1]++;
+            else if((input=='a' || input=='A') && Cur1[1] > 0)   Cur1[1]--;
             else if(input=='\r' || input=='\n')     firstC++;
             Cur2[0]=Cur1[0];    Cur2[1]=Cur1[1]; //aggiorno in automatico anche il cursore2
 
         }
         else {//modifico il secondo curosre
 
-            if(input=='w' || input=='W') Cur2[0]--;
-            else if(input=='s' || input=='S') Cur2[0]++;
-            else if(input=='d' || input=='D')   Cur2[1]++;
-            else if(input=='a' || input=='A')   Cur2[1]--;
-            else if(input=='\r' || input=='\n')     firstC = movepece(ChessB, Cur1, Cur2); //resetto anche la condizione
+            if((input=='w' || input=='W') && Cur2[0] > 0) Cur2[0]--;
+            else if((input=='s' || input=='S') && Cur2[0] < 7) Cur2[0]++;
+            else if((input=='d' || input=='D') && Cur2[1] < 7)   Cur2[1]++;
+            else if((input=='a' || input=='A') && Cur2[1] > 0)   Cur2[1]--;
+            else if(input=='\r' || input=='\n')     {
+                if(checkmove(ChessB, Cur1, Cur2)) firstC=movepiece(ChessB, Cur1, Cur2);
+                else firstC=0;
+            }
 
         }
 
