@@ -215,9 +215,10 @@ void localmultiplayer() {
         */
         //////////////////////////////////// CICLO DI STAMPA SCACCHIERA GRANDE /////////////////////////////////////ù
 
-printf("-----------------------------------------------------------------\n");
+printf("    -----------------------------------------------------------------\n");
 for(i = 0; i < 8; i++) {
     for(x = 0; x < 5; x++) {
+        printf("    ");
         for(j = 0; j < 8; j++) {
             printf("|");
             
@@ -241,9 +242,18 @@ for(i = 0; i < 8; i++) {
                 default:  printf("       "); break;
             }
         }
-        printf("|\n");
+        printf("|");
+        if(x==1 && i==0) printf("     --------------------------------------------");
+        if(x==2 && i==0) printf("     |          LOCAL MULTIPLAYER MODE          |");
+        if(x==3 && i==0) printf("     | Use wasd keys to move the cursor and     |");
+        if(x==4 && i==0) printf("     | press enter to select/confirm your move  |");
+        if(x==0 && i==1) printf("     | Press 'q' to quit the game               |");
+        if(x==1 && i==1) printf("     --------------------------------------------");
+        printf("\n");
+        
+
     }
-    printf("-----------------------------------------------------------------\n");
+    printf("    -----------------------------------------------------------------\n");
 }
 
 
@@ -265,6 +275,10 @@ for(i = 0; i < 8; i++) {
 
 
         input = readinput();
+
+        if(input=='q' || input=='Q') { //condizione di uscita dalla modalità
+            return;
+        }
 
         //x e y sono le coordiante del cursore, ogni volta che mi muovo negono aggiornate
         if(!firstC) {//modifico il primo cursore
