@@ -1,5 +1,5 @@
 #include "localmp.h"
-#include "HomeBanner.h"
+#include "homebanner.h"
 
 #include <time.h>
 #include <stdlib.h>
@@ -16,39 +16,40 @@
 
 #endif
 
-char *PGN;
+char *PGN = NULL;
 
-char readinput() {
+char readinput(void) {
 
     #ifdef _WIN32
-        return getch();
+        return _getch();
 
     #else
-        struct termios vecchio, nuovo;
+        struct termios oldterm, newterm;
         char ch;
-        tcgetattr(STDIN_FILENO, &vecchio); // Salva le impostazioni attuali
-        nuovo = vecchio;
-        nuovo.c_lflag &= ~(ICANON | ECHO); // Disabilita buffering e la stampa a schermo
-        tcsetattr(STDIN_FILENO, TCSANOW, &nuovo); // Applica le nuove impostazioni
-        ch = getchar(); // Ora getchar() legge IMMEDIATAMENTE
-        tcsetattr(STDIN_FILENO, TCSANOW, &vecchio); // Ripristina le impostazioni originali
+        tcgetattr(STDIN_FILENO, &oldterm); // Save the current settings
+        newterm = oldterm;
+        newterm.c_lflag &= ~(ICANON | ECHO); // Disable buffering and echo on screen
+        tcsetattr(STDIN_FILENO, TCSANOW, &newterm); // Apply the new settings
+        ch = getchar(); // Now getchar() reads IMMEDIATELY
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldterm); // Restore the original settings
         return ch;
 
     #endif
     }
 
 /***************************************************************************************************************** */
-int nmove=0, is_selected, is_validmove;
+int nmove = 0;
+
 int movepiece(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
 
     ChessB[ Cur2[0] ][ Cur2[1] ]=ChessB[ Cur1[0] ][ Cur1[1] ];
     ChessB[ Cur1[0] ][ Cur1[1] ]='.';
-    //resetto i cursori
-    if(nmove & 1) {//se il numero di mosse è pari gioca il bianco
+    //reset the cursors: nmove is still the counter BEFORE this move
+    if(nmove & 1) {//odd -> black has just moved, so white plays next
         Cur1[0]=7;  Cur1[1]=0;
         Cur2[0]=7;  Cur2[1]=0;
     }
-    else {
+    else {//even -> white has just moved, so black plays next
         Cur1[0]=0;  Cur1[1]=7;
         Cur2[0]=0;  Cur2[1]=7;
     }
@@ -60,63 +61,102 @@ int movepiece(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
 
 /******************************************************************************************************** */
 
-void makePGN(char ChessB[8][8], const int Cur1[2], const int Cur2[2], char promo) {}
+void makePGN(char ChessB[8][8], const int Cur1[2], const int Cur2[2], char promo) {
+    /* Not implemented yet: the parameters are voided to keep the build warning free */
+    (void)ChessB;
+    (void)Cur1;
+    (void)Cur2;
+    (void)promo;
+}
 
-void stampaPGN(void) {
+void printPGN(void) {
     if (PGN != NULL) {
-        printf("PGN Corrente:\n%s\n", PGN);
+        printf("Current PGN:\n%s\n", PGN);
     } else {
-        printf("Nessun PGN generato.\n");
+        printf("No PGN generated.\n");
     }
 }
 
 /*********************************************************************************************************** */
+
+int isPathClear(char ChessB[8][8], int r1, int c1, int r2, int c2) {
+    /* We work out the direction of the step (1, -1 or 0) for rows and columns */
+    int row_step = (r2 > r1) ? 1 : ((r2 < r1) ? -1 : 0);
+    int col_step = (c2 > c1) ? 1 : ((c2 < c1) ? -1 : 0);
+
+    int r = r1 + row_step;
+    int c = c1 + col_step;
+
+    /* We walk over the squares in between until we reach the destination */
+    while(r != r2 || c != c2) {
+        if(ChessB[r][c] != '.') {
+            return 0; /* Obstacle found, the piece cannot jump over it! */
+        }
+        r += row_step;
+        c += col_step;
+    }
+
+    return 1; /* Path clear */
+}
+
+/*********************************************************************************************************** */
+
 int checkmove(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
     int isWhiteTurn;
     char destPiece;
 
+    /* Prevents "moving" a piece onto the square it already sits on */
+    if (Cur1[0] == Cur2[0] && Cur1[1] == Cur2[1]) return 0;
+
     isWhiteTurn = !(nmove & 1);
 
-    /* Controllo che il giocatore muova i suoi pezzi */
+    /* Check that the player is moving one of his own pieces */
     if ((isWhiteTurn && ChessB[Cur1[0]][Cur1[1]] >= 'A' && ChessB[Cur1[0]][Cur1[1]] <= 'Z') ||
         (!isWhiteTurn && ChessB[Cur1[0]][Cur1[1]] >= 'a' && ChessB[Cur1[0]][Cur1[1]] <= 'z')) {
-        
+
         destPiece = ChessB[Cur2[0]][Cur2[1]];
 
-        /* Impedisce di muovere/mangiare sopra un pezzo alleato */
+        /* Prevents moving onto / capturing a friendly piece */
         if (isWhiteTurn && destPiece >= 'A' && destPiece <= 'Z') return 0;
         if (!isWhiteTurn && destPiece >= 'a' && destPiece <= 'z') return 0;
 
         switch(ChessB[Cur1[0]][Cur1[1]]) {
-            case 'p':   /* pedone nero */
+            case 'p':   /* black pawn */
                 if(Cur2[0]==Cur1[0]+1 && Cur2[1]==Cur1[1] && ChessB[Cur2[0]][Cur2[1]]=='.') return 1;
                 else if(Cur2[0]==Cur1[0]+2 && Cur2[1]==Cur1[1] && ChessB[Cur2[0]][Cur2[1]]=='.' && ChessB[Cur2[0]-1][Cur2[1]]=='.' && Cur1[0]==1) return 1;
                 else if(Cur2[0]==Cur1[0]+1 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1) && ChessB[Cur2[0]][Cur2[1]]>='A' && ChessB[Cur2[0]][Cur2[1]]<='Z') return 1;
                 break;
-            case 'P':   /* pedone bianco */
+            case 'P':   /* white pawn */
                 if(Cur2[0]==Cur1[0]-1 && Cur2[1]==Cur1[1] && ChessB[Cur2[0]][Cur2[1]]=='.') return 1;
                 else if(Cur2[0]==Cur1[0]-2 && Cur2[1]==Cur1[1] && ChessB[Cur2[0]][Cur2[1]]=='.' && ChessB[Cur2[0]+1][Cur2[1]]=='.' && Cur1[0]==6) return 1;
                 else if(Cur2[0]==Cur1[0]-1 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1) && ChessB[Cur2[0]][Cur2[1]]>='a' && ChessB[Cur2[0]][Cur2[1]]<='z') return 1;
                 break;
-            case 'r':   /* torre nera */
-            case 'R':   /* torre bianca */
-                if(Cur2[0]==Cur1[0] || Cur2[1]==Cur1[1]) return 1;
+            case 'r':   /* black rook */
+            case 'R':   /* white rook */
+                if(Cur2[0]==Cur1[0] || Cur2[1]==Cur1[1]) {
+                    return isPathClear(ChessB, Cur1[0], Cur1[1], Cur2[0], Cur2[1]);
+                }
                 break;
-            case 'n':   /* cavallo nero */
-            case 'N':   /* cavallo bianco */
-                if((Cur2[0]==Cur1[0]+2 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1)) || (Cur2[0]==Cur1[0]-2 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1)) || 
+            case 'n':   /* black knight */
+            case 'N':   /* white knight */
+                /* The knight JUMPS, so we do not use isPathClear() */
+                if((Cur2[0]==Cur1[0]+2 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1)) || (Cur2[0]==Cur1[0]-2 && (Cur2[1]==Cur1[1]+1 || Cur2[1]==Cur1[1]-1)) ||
                     (Cur2[0]==Cur1[0]+1 && (Cur2[1]==Cur1[1]+2 || Cur2[1]==Cur1[1]-2)) || (Cur2[0]==Cur1[0]-1 && (Cur2[1]==Cur1[1]+2 || Cur2[1]==Cur1[1]-2))) return 1;
                 break;
-            case 'b':   /* alfiere nero */
-            case 'B':   /* alfiere bianco */
-                if(abs(Cur2[0]-Cur1[0])==abs(Cur2[1]-Cur1[1])) return 1;
+            case 'b':   /* black bishop */
+            case 'B':   /* white bishop */
+                if(abs(Cur2[0]-Cur1[0])==abs(Cur2[1]-Cur1[1])) {
+                    return isPathClear(ChessB, Cur1[0], Cur1[1], Cur2[0], Cur2[1]);
+                }
                 break;
-            case 'q':   /* regina nera */
-            case 'Q':   /* regina bianca */
-                if(Cur2[0]==Cur1[0] || Cur2[1]==Cur1[1] || abs(Cur2[0]-Cur1[0])==abs(Cur2[1]-Cur1[1])) return 1;
+            case 'q':   /* black queen */
+            case 'Q':   /* white queen */
+                if(Cur2[0]==Cur1[0] || Cur2[1]==Cur1[1] || abs(Cur2[0]-Cur1[0])==abs(Cur2[1]-Cur1[1])) {
+                    return isPathClear(ChessB, Cur1[0], Cur1[1], Cur2[0], Cur2[1]);
+                }
                 break;
-            case 'k':   /* re nero */
-            case 'K':   /* re bianco */
+            case 'k':   /* black king */
+            case 'K':   /* white king */
                 if(abs(Cur2[0]-Cur1[0])<=1 && abs(Cur2[1]-Cur1[1])<=1) return 1;
                 break;
             default:
@@ -128,17 +168,18 @@ int checkmove(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
 }
 /*********************************************************************************************************** */
 
+/* Returns 1 if the king of the side to move is SAFE after the move, 0 if it is in check */
 int checkcheck(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
-    /* 1. Dichiarazione di TUTTE le variabili in cima al blocco (Regola C89) */
+    /* 1. Declaration of ALL the variables at the top of the block (C89 rule) */
     char ChessBcopy[8][8];
     int kingpos[2];
     int kingiswhite;
     char targetKing;
     int found;
-    int i, j, d, step, r, c; /* Contatori e coordinate riutilizzabili */
+    int i, j, d, step, r, c; /* Reusable counters and coordinates */
     char piece;
-    
-    /* Vettori di direzione dichiarati e inizializzati prima del codice eseguibile */
+
+    /* Direction vectors declared and initialised before the executable code */
     int diagX[4] = {1, 1, -1, -1};
     int diagY[4] = {1, -1, 1, -1};
     int orthoX[4] = {1, -1, 0, 0};
@@ -147,18 +188,22 @@ int checkcheck(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
     int knightY[8] = {1, -1, 1, -1, 2, -2, 2, -2};
 
     /* --------------------------------------------------------- */
-    /* 2. Inizio delle istruzioni eseguibili                     */
+    /* 2. Start of the executable statements                     */
     /* --------------------------------------------------------- */
 
-    /* Copio la scacchiera e applico la mossa */
+    /* I copy the board and apply the move */
     memcpy(ChessBcopy, ChessB, sizeof(ChessBcopy));
-    ChessBcopy[Cur2[0]][Cur2[1]] = ChessBcopy[Cur1[0]][Cur1[1]];
-    ChessBcopy[Cur1[0]][Cur1[1]] = '.'; /* Svuoto la casella di partenza */
+    if (Cur1[0] != Cur2[0] || Cur1[1] != Cur2[1]) { /* same square = no move, nothing to apply */
+        ChessBcopy[Cur2[0]][Cur2[1]] = ChessBcopy[Cur1[0]][Cur1[1]];
+        ChessBcopy[Cur1[0]][Cur1[1]] = '.'; /* I empty the starting square */
+    }
 
-    /* Capisco di chi e' il turno e cerco il Re corretto */
-    kingiswhite = (nmove & 1) ? 0 : 1; 
+    /* I work out whose turn it is and I look for the right King */
+    kingiswhite = (nmove & 1) ? 0 : 1;
     targetKing = kingiswhite ? 'K' : 'k';
     found = 0;
+    kingpos[0] = 0;
+    kingpos[1] = 0;
 
     for (i = 0; i < 8 && !found; i++) {
         for (j = 0; j < 8 && !found; j++) {
@@ -170,7 +215,9 @@ int checkcheck(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
         }
     }
 
-    /* Controllo Diagonali per Alfieri (B/b) e Regine (Q/q) */
+    if (!found) return 1; /* No king on the board: nothing can be attacked */
+
+    /* Check of the diagonals for Bishops (B/b) and Queens (Q/q) */
     for (d = 0; d < 4; d++) {
         for (step = 1; step < 8; step++) {
             r = kingpos[0] + (diagX[d] * step);
@@ -187,7 +234,7 @@ int checkcheck(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
         }
     }
 
-    /* Controllo Linee Rette per Torri (R/r) e Regine (Q/q) */
+    /* Check of the straight lines for Rooks (R/r) and Queens (Q/q) */
     for (d = 0; d < 4; d++) {
         for (step = 1; step < 8; step++) {
             r = kingpos[0] + (orthoX[d] * step);
@@ -204,7 +251,7 @@ int checkcheck(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
         }
     }
 
-    /* Controllo Cavalli (N/n) */
+    /* Check of the Knights (N/n) */
     for (i = 0; i < 8; i++) {
         r = kingpos[0] + knightX[i];
         c = kingpos[1] + knightY[i];
@@ -215,7 +262,7 @@ int checkcheck(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
         }
     }
 
-    /* Controllo Pedoni (P/p) */
+    /* Check of the Pawns (P/p) */
     if (kingiswhite) {
         if (kingpos[0] > 0) {
             if (kingpos[1] > 0 && ChessBcopy[kingpos[0]-1][kingpos[1]-1] == 'p') return 0;
@@ -228,7 +275,7 @@ int checkcheck(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
         }
     }
 
-    /* Controllo del Re avversario (K/k) */
+    /* Check of the enemy King (K/k) */
     for (i = -1; i <= 1; i++) {
         for (j = -1; j <= 1; j++) {
             if (i == 0 && j == 0) continue;
@@ -242,7 +289,7 @@ int checkcheck(char ChessB[8][8], int Cur1[2], int Cur2[2]) {
         }
     }
 
-    /* Se arrivo fin qui, significa che nessuno minaccia il Re */
+    /* If I get this far, it means that nobody is threatening the King */
     return 1;
 }
 /***************************************** */
@@ -258,7 +305,7 @@ int checkcheckmate(char ChessB[8][8]) {
 
     isWhiteTurn = !(nmove & 1);
 
-    /* Trova una casella vuota per fare un controllo a vuoto (no-op) tramite checkcheck */
+    /* Find an empty square to run an idle check (no-op) through checkcheck */
     dummyCur1[0] = 0; dummyCur1[1] = 0;
     dummyCur2[0] = 0; dummyCur2[1] = 0;
     for (i = 0; i < 8; i++) {
@@ -272,35 +319,35 @@ int checkcheckmate(char ChessB[8][8]) {
         if (ChessB[dummyCur1[0]][dummyCur1[1]] == '.') break;
     }
 
-    /* 1. Il re deve essere attualmente sotto scacco. 
-       Se checkcheck restituisce 1, significa che NON c'è scacco, quindi non può essere matto. */
+    /* 1. The king must currently be in check.
+       If checkcheck returns 1 it means there is NO check, so it cannot be mate. */
     if (checkcheck(ChessB, dummyCur1, dummyCur2)) {
-        return 0; 
+        return 0;
     }
 
-    /* 2. Scansiona tutta la scacchiera per trovare i pezzi del giocatore di turno */
+    /* 2. Scan the whole board looking for the pieces of the player to move */
     for (i = 0; i < 8; i++) {
         for (j = 0; j < 8; j++) {
             p = ChessB[i][j];
-            
+
             isMyPiece = isWhiteTurn ? (p >= 'A' && p <= 'Z') : (p >= 'a' && p <= 'z');
-            
+
             if (isMyPiece) {
-                /* 3. Per ogni pezzo, prova a muoverlo in ogni casella della scacchiera */
+                /* 3. For every piece, try to move it to every square of the board */
                 for (targetR = 0; targetR < 8; targetR++) {
                     for (targetC = 0; targetC < 8; targetC++) {
                         cur1[0] = i;
                         cur1[1] = j;
                         cur2[0] = targetR;
                         cur2[1] = targetC;
-                        
-                        /* 4. Verifica se la mossa è geometricamente valida e non amichevole */
+
+                        /* 4. Check whether the move is geometrically valid and not onto a friendly piece */
                         if (checkmove(ChessB, cur1, cur2)) {
-                            
-                            /* 5. Simula la mossa ed esegui checkcheck.
-                               Se checkcheck restituisce 1, la mossa ha salvato il re -> Non è matto. */
+
+                            /* 5. Simulate the move and run checkcheck.
+                               If checkcheck returns 1 the move has saved the king -> it is not mate. */
                             if (checkcheck(ChessB, cur1, cur2)) {
-                                return 0; 
+                                return 0;
                             }
                         }
                     }
@@ -309,79 +356,69 @@ int checkcheckmate(char ChessB[8][8]) {
         }
     }
 
-    /* 6. Se il ciclo finisce senza trovare alcuna mossa legale salvifica, è scacco matto. */
+    /* 6. If the loop ends without finding any legal saving move, it is checkmate. */
     return 1;
 }
 
-void clearterm1() { //pulisce lo schermo
+void clearterm1(void) { //clears the screen
 
     #ifdef _WIN32
         system("cls");
         return;
 
-    #else 
+    #else
         system("clear");
         return;
-    
+
     #endif
 }
 
 /*************************************************************************************************************** */
 
-void clearterm2() { //riporta il cursore in alto a sinistra
+void clearterm2(void) { //brings the cursor back to the top left corner
 
     #ifdef _WIN32
     COORD coord = {0, 0};
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
         return;
 
-    #else 
+    #else
         printf("\033[H");
         return;
-    
+
     #endif
 }
 
 /*************************************************************************************************************** */
 
-void localmultiplayer() {
-    clearterm1();
-
-    int endgame[4] = {1,0,0,0};
-    int i,j,x,y,t;
+int localmultiplayer(void) {
+    int endgame[3] = {1,0,0};
+    int i,j,x,t;
     int Cur1[2] = {7,0};
     int Cur2[2] = {7,0};
+    int is_selected;
+    int whiteWins;
     char input, firstC=0;
-    //Definisco la cacchiera e ci varico i pezzi
+    //I define the chessboard and I place the pieces on it
     char ChessB[8][8] = {
-    {'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'}, // Riga 0: Pezzi neri
-    {'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'}, // Riga 1: Pedoni neri
-    {'.', '.', '.', '.', '.', '.', '.', '.'}, // Riga 2: Vuota
-    {'.', '.', '.', '.', '.', '.', '.', '.'}, // Riga 3: Vuota
-    {'.', '.', '.', '.', '.', '.', '.', '.'}, // Riga 4: Vuota
-    {'.', '.', '.', '.', '.', '.', '.', '.'}, // Riga 5: Vuota
-    {'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'}, // Riga 6: Pedoni bianchi
-    {'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'}  // Riga 7: Pezzi bianchi
+    {'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'}, // Row 0: black pieces
+    {'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'}, // Row 1: black pawns
+    {'.', '.', '.', '.', '.', '.', '.', '.'}, // Row 2: empty
+    {'.', '.', '.', '.', '.', '.', '.', '.'}, // Row 3: empty
+    {'.', '.', '.', '.', '.', '.', '.', '.'}, // Row 4: empty
+    {'.', '.', '.', '.', '.', '.', '.', '.'}, // Row 5: empty
+    {'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'}, // Row 6: white pawns
+    {'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'}  // Row 7: white pieces
     };
-    
-    char ChessC[8][8] = 
-    {
-    {'_', '_', '_', '_', '_', '_', '_', '_'}, 
-    {'_', '_', '_', '_', '_', '_', '_', '_'}, 
-    {'_', '_', '_', '_', '_', '_', '_', '_'}, 
-    {'_', '_', '_', '_', '_', '_', '_', '_'}, 
-    {'_', '_', '_', '_', '_', '_', '_', '_'}, 
-    {'_', '_', '_', '_', '_', '_', '_', '_'}, 
-    {'_', '_', '_', '_', '_', '_', '_', '_'}, 
-    {'_', '_', '_', '_', '_', '_', '_', '_'}  
-    };
+
+    clearterm1();
 
     while(1) {
 
         clearterm2();
 
         /*
-        //funzione provvisoria stampa scacchiera
+        //temporary function, prints the board
         for(i=0;i<8;i++) {
 
             printf("\t");
@@ -392,146 +429,131 @@ void localmultiplayer() {
 
         }
         printf("\n");
-        //funzione provvisoria stampa cursore 1
+        //temporary function, prints the two cursors
         for(i=0;i<8;i++) {
 
             printf("\t");
             for(j=0;j<8;j++) {
-                if(i==Cur1[0] && j==Cur1[1])   printf("| X |");
-                printf("| %c |", ChessC[i][j]);
-            }
-            printf("\n");
-
-        }
-        printf("\n");
-        //funzione provvisoria stampa cursore 2
-        for(i=0;i<8;i++) {
-
-            printf("\t");
-            for(j=0;j<8;j++) {
-                if(i==Cur2[0] && j==Cur2[1])   printf("| X |");
-                printf("| %c |", ChessC[i][j]);
+                if(i==Cur1[0] && j==Cur1[1])        printf("| 1 |");
+                else if(i==Cur2[0] && j==Cur2[1])   printf("| 2 |");
+                else                                printf("| _ |");
             }
             printf("\n");
 
         }
         */
-        //////////////////////////////////// CICLO DI STAMPA SCACCHIERA GRANDE /////////////////////////////////////ù
+        //////////////////////////////////// BIG CHESSBOARD PRINTING LOOP /////////////////////////////////////
 
-printf("    -----------------------------------------------------------------\n");
-for(i = 0; i < 8; i++) {
-    for(x = 0; x < 5; x++) {
-        printf("    ");
-        for(j = 0; j < 8; j++) {
-            printf("|");
-            
-            // Determina se la cella corrente è selezionata dal cursore
-            int is_selected = (Cur1[0] == i && Cur1[1] == j) || (Cur2[0] == i && Cur2[1] == j);
+        printf("    -----------------------------------------------------------------\n");
+        for(i = 0; i < 8; i++) {
+            for(x = 0; x < 5; x++) {
+                printf("    ");
+                for(j = 0; j < 8; j++) {
+                    printf("|");
 
-            switch (ChessB[i][j]) {
-                case 'p': printf("%s", is_selected ? PawnBC[x] : PawnB[x]); break;
-                case 'r': printf("%s", is_selected ? RockBC[x] : RockB[x]); break;
-                case 'n': printf("%s", is_selected ? KnightBC[x] : KnightB[x]); break;
-                case 'b': printf("%s", is_selected ? BishopBC[x] : BishopB[x]); break;
-                case 'q': printf("%s", is_selected ? QueenBC[x] : QueenB[x]); break;
-                case 'k': printf("%s", is_selected ? KingBC[x] : KingB[x]); break;
-                case 'P': printf("%s", is_selected ? PawnWC[x] : PawnW[x]); break;
-                case 'R': printf("%s", is_selected ? RockWC[x] : RockW[x]); break;
-                case 'N': printf("%s", is_selected ? KnightWC[x] : KnightW[x]); break;
-                case 'B': printf("%s", is_selected ? BishopWC[x] : BishopW[x]); break;
-                case 'Q': printf("%s", is_selected ? QueenWC[x] : QueenW[x]); break;
-                case 'K': printf("%s", is_selected ? KingWC[x] : KingW[x]); break;
-                case '.': printf("%s", is_selected ? EmptySC[x] : EmptyS[x]); break;
-                default:  printf("       "); break;
+                    // Works out whether the current cell is selected by one of the cursors
+                    is_selected = (Cur1[0] == i && Cur1[1] == j) || (Cur2[0] == i && Cur2[1] == j);
+
+                    switch (ChessB[i][j]) {
+                        case 'p': printf("%s", is_selected ? PawnBC[x] : PawnB[x]); break;
+                        case 'r': printf("%s", is_selected ? RookBC[x] : RookB[x]); break;
+                        case 'n': printf("%s", is_selected ? KnightBC[x] : KnightB[x]); break;
+                        case 'b': printf("%s", is_selected ? BishopBC[x] : BishopB[x]); break;
+                        case 'q': printf("%s", is_selected ? QueenBC[x] : QueenB[x]); break;
+                        case 'k': printf("%s", is_selected ? KingBC[x] : KingB[x]); break;
+                        case 'P': printf("%s", is_selected ? PawnWC[x] : PawnW[x]); break;
+                        case 'R': printf("%s", is_selected ? RookWC[x] : RookW[x]); break;
+                        case 'N': printf("%s", is_selected ? KnightWC[x] : KnightW[x]); break;
+                        case 'B': printf("%s", is_selected ? BishopWC[x] : BishopW[x]); break;
+                        case 'Q': printf("%s", is_selected ? QueenWC[x] : QueenW[x]); break;
+                        case 'K': printf("%s", is_selected ? KingWC[x] : KingW[x]); break;
+                        case '.': printf("%s", is_selected ? EmptySC[x] : EmptyS[x]); break;
+                        default:  printf("       "); break;
+                    }
+                }
+                printf("|");
+                if(x==1 && i==0) printf("     --------------------------------------------");
+                if(x==2 && i==0) printf("     |          LOCAL MULTIPLAYER MODE          |");
+                if(x==3 && i==0) printf("     | Use wasd keys to move the cursor and     |");
+                if(x==4 && i==0) printf("     | press enter to select/confirm your move  |");
+                if(x==0 && i==1) printf("     | Press 'q' to quit the game               |");
+                if(x==1 && i==1) printf("     --------------------------------------------");
+                printf("\n");
+
+
             }
+            printf("    -----------------------------------------------------------------\n");
         }
-        printf("|");
-        if(x==1 && i==0) printf("     --------------------------------------------");
-        if(x==2 && i==0) printf("     |          LOCAL MULTIPLAYER MODE          |");
-        if(x==3 && i==0) printf("     | Use wasd keys to move the cursor and     |");
-        if(x==4 && i==0) printf("     | press enter to select/confirm your move  |");
-        if(x==0 && i==1) printf("     | Press 'q' to quit the game               |");
-        if(x==1 && i==1) printf("     --------------------------------------------");
-        printf("\n");
-        
 
-    }
-    printf("    -----------------------------------------------------------------\n");
-}
-
-        //controllo lo scacco matto
+        //I check for the checkmate
         if( checkcheckmate(ChessB) ) {
+            //the side to move is mated, so the other one wins: I read the winner BEFORE resetting nmove
+            whiteWins = (nmove & 1);
+            //I reset the variable for the next game
+            nmove=0;
             clearterm1();
             while(1) {
 
                 clearterm2();
                 printf("\n\n\n\n");
-                if(nmove & 1) printf(CheckMateBannerW);
-                else printf(CheckMateBannerB);
+                if(whiteWins) printf("%s", CheckMateBannerW);
+                else printf("%s", CheckMateBannerB);
 
-                menuendgame:
                 if(endgame[0])    printf("%s\n", postmate1);
                 else if(endgame[1])    printf("%s\n", postmate2);
                 else if(endgame[2])    printf("%s\n", postmate3);
-                else if(endgame[3])    printf("%s\n", postmate4);
-
                 input = readinput();
 
-                if (input == 'w' || input == 'W' || input == 'd' || input == 'D') {
-                    t = endgame[3];
-                    for (i = 2; i >= 0; i--) {
+                if (input == 's' || input == 'S' || input == 'a' || input == 'A') {
+                    t = endgame[2];
+                    for (i = 1; i >= 0; i--) {
                         endgame[i + 1] = endgame[i];
                     }
                     endgame[0] = t;
                 }
-                else if (input == 's' || input == 'S' || input == 'A' || input == 'a') {
+                else if (input == 'w' || input == 'W' || input == 'd' || input == 'D') {
                     t = endgame[0];
-                    for (i = 0; i <= 2; i++) {
+                    for (i = 0; i <= 1; i++) {
                         endgame[i] = endgame[i + 1];
                     }
-                    endgame[3] = t; // Corretto l'indice finale a 3
+                    endgame[2] = t;
                 }
                 else if (input == '\n' || input == '\r') {
-                    if (endgame[0]) {
-                        stampaPGN();
-                        goto menuendgame;
-                    }
-                    if (endgame[1]) return 1;
-                    if (endgame[2]) return 1;
-                    if (endgame[3]) return 1;
+                    if (endgame[0]) return 1;
+                    if (endgame[1]) return 2;
+                    if (endgame[2]) return 0;
                     return 0;
                 }
-            
+
             }
-            
-                return;
-            }
+
+        }
 
         input = readinput();
 
-        if(input=='q' || input=='Q') { //condizione di uscita dalla modalità
-            return;
+        if(input=='q' || input=='Q') { //exit condition of the game mode
+            return 0;
         }
 
-        //x e y sono le coordiante del cursore, ogni volta che mi muovo negono aggiornate
-        if(!firstC) {//modifico il primo cursore
+        //the cursors hold the coordinates of the selected cell, they are updated on every move
+        if(!firstC) {//I modify the first cursor
 
             if((input=='w' || input=='W') && Cur1[0] > 0) Cur1[0]--;
             else if((input=='s' || input=='S') && Cur1[0] < 7) Cur1[0]++;
             else if((input=='d' || input=='D') && Cur1[1] < 7)   Cur1[1]++;
             else if((input=='a' || input=='A') && Cur1[1] > 0)   Cur1[1]--;
             else if(input=='\r' || input=='\n')     firstC++;
-            Cur2[0]=Cur1[0];    Cur2[1]=Cur1[1]; //aggiorno in automatico anche il cursore2
+            Cur2[0]=Cur1[0];    Cur2[1]=Cur1[1]; //I automatically update the second cursor too
 
         }
-        else {//modifico il secondo curosre
+        else {//I modify the second cursor
 
             if((input=='w' || input=='W') && Cur2[0] > 0) Cur2[0]--;
             else if((input=='s' || input=='S') && Cur2[0] < 7) Cur2[0]++;
             else if((input=='d' || input=='D') && Cur2[1] < 7)   Cur2[1]++;
             else if((input=='a' || input=='A') && Cur2[1] > 0)   Cur2[1]--;
             else if(input=='\r' || input=='\n')     {
-                /*controllo la validità della mossa*/
+                /*I check that the move is valid*/
                 if(checkmove(ChessB, Cur1, Cur2) && checkcheck(ChessB, Cur1, Cur2)) firstC=movepiece(ChessB, Cur1, Cur2);
                 else firstC=0;
             }
@@ -544,19 +566,19 @@ for(i = 0; i < 8; i++) {
 
 /************************************************************************************************************************ */
 
-    void challengebot() {
-        
+    void challengebot(void) {
+
         clearterm1();
         printf("challenge bot");
         getchar();
         return;
-        
+
     }
 
 /********************************************************************************************************************* */
 
-    void learn() {
-        
+    void learn(void) {
+
         clearterm1();
         printf("learn");
         getchar();

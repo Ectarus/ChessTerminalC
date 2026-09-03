@@ -2,23 +2,24 @@
 
 #include "localmp.h"
 
-#include "HomeBanner.h"
+#include "homebanner.h"
 
-int main() {
+int main(void) {
 
-    int i;
+    int i, temp;
     char input='z', t;
     char Selection[3] = {1,0,0};
 
-    //SCHERMATA HOME
+    //HOME SCREEN
+    startmenu:
     while(1) {
-        //pulisco lo schermo
+        //I clear the screen
         clearterm1();
-        
-        //print up bunner
+
+        //print up banner
         printf("%s\n", HomeBanner);
-        
-        //print mode game
+
+        //print game modes
         printf("%s\n", PreCh);
 
         //print cursor
@@ -26,7 +27,7 @@ int main() {
         else if(Selection[1])    printf("%s\n", Print2Ch);
         else if(Selection[2])    printf("%s\n", Print3Ch);
 
-        //lettura input
+        //input reading
         input = readinput();
 
         //circular shift on Array
@@ -40,13 +41,20 @@ int main() {
         else if(input=='s' || input=='S' || input=='A' || input=='a') {
 
             t=Selection[0];
-            for(i=0; i<=2; i++) Selection[i]=Selection[i+1];
-            Selection[i-1]=t;
-            
+            for(i=0; i<=1; i++) Selection[i]=Selection[i+1];
+            Selection[2]=t;
+
         }
+        else if(input=='q' || input=='Q') return 0;
         else if(input=='\n' || input=='\r')    {
 
-            if(Selection[0])    localmultiplayer();
+            if(Selection[0]) {
+                startlocalmp:
+                temp = localmultiplayer();
+                if(temp==1)  goto startlocalmp;
+                else if(temp==2)  goto startmenu;
+                else return 0;
+            }
             else if(Selection[1])   challengebot();
             else if(Selection[2])   learn();
 
